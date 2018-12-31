@@ -1,17 +1,31 @@
-import sns = require('@aws-cdk/aws-sns');
-import sqs = require('@aws-cdk/aws-sqs');
+import lambda = require("@aws-cdk/aws-lambda");
+import apigw = require("@aws-cdk/aws-apigateway");
+import { HitCounter} from './hitcounter';
+import { TableViewer } from 'cdk-dynamo-table-viewer';
+
 import cdk = require('@aws-cdk/cdk');
 
 export class CdkWorkshopStack extends cdk.Stack {
   constructor(parent: cdk.App, name: string, props?: cdk.StackProps) {
     super(parent, name, props);
 
-    const queue = new sqs.Queue(this, 'CdkWorkshopQueue', {
-      visibilityTimeoutSec: 300
+    const hello = new lambda.Function(this, 'Hellohandler', {
+      code: lambda.Code.asset('lambda'),
+      runtime: lambda.Runtime.NodeJS810,
+      handler: "hello.handler"
     });
 
-    const topic = new sns.Topic(this, 'CdkWorkshopTopic');
+    const helloWithCounter = new HitCounter(this, 'HelloHitCounter', {
+      downstream: hello
+    });
 
-    topic.subscribeQueue(queue);
+    new apigw.LambdaRestApi(this, 'Endpoint', {
+      handler: helloWithCounter.handler
+    });
+
+    new TableViewer(this, 'ViewHitCounter', {
+      title: 'Hello hits',
+      table: helloWithCounter.table
+    })
   }
 }
